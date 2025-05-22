@@ -12,7 +12,7 @@ from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
-
+CORS(app)
 
 # MySQL database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:GodsGrace5@localhost/marvel'
@@ -74,10 +74,9 @@ with app.app_context():
 
 @app.route('/api/characters', methods=['GET'])
 def get_characters():
-    characters = Character.query.all()
-    result = [char.to_dict() for char in characters]
+    characters = db.session.query(Character).all()
+    result = characters_schema.dump(characters)
     return jsonify(result)
-
 
 
 @app.route('/characters/<int:id>', methods=['GET'])
@@ -143,4 +142,5 @@ def delete_character(id):
     return jsonify({"message": "Character successfully deleted"}), 200
 
 
-app.run(debug=True) # runs flask server
+if __name__ == "__main__":
+    app.run(debug=True, port=5050)

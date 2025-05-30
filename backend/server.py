@@ -1,9 +1,5 @@
-# py -m venv venv | python3 -m venv venv - create virtual env
-# venv\Scripts\activate | source venv/bin/activate - activate virtual env 
-# pip install -r requirements.txt
-
 from flask import Flask, request, jsonify
-from sqlalchemy import String, Enum, Text, Integer, select, create_engine, text
+from sqlalchemy import String, Enum, Text, Integer, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from flask_sqlalchemy import SQLAlchemy
 from marshmallow import ValidationError, fields
@@ -18,8 +14,7 @@ CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:GodsGrace5@localhost/marvel'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-
-#Creating our Base Model
+# Creating our Base Model
 class Base(DeclarativeBase):
     pass
 
@@ -38,10 +33,8 @@ class Character(Base):
     alignment: Mapped[str] = mapped_column(Enum('hero', 'villain', name="alignment_enum"), nullable=False)
     powers: Mapped[str] = mapped_column(Text, nullable=False)
     image_url: Mapped[str] = mapped_column(String(255), nullable=False)
-		
-	
-# Character Schema
 
+# Character Schema
 class CharacterSchema(ma.Schema):
     id = fields.Int(required=False)
     name = fields.String(required=True)
@@ -52,24 +45,21 @@ class CharacterSchema(ma.Schema):
 
     class Meta:
         fields = ("id", "name", "alias", "alignment", "powers", "image_url")
-        
+
 # Initialize Schemas
 character_schema = CharacterSchema()
-characters_schema = CharacterSchema(many=True) #Can serialize many Trainer objects (a list of them)
-
+characters_schema = CharacterSchema(many=True)  # Can serialize many Trainer objects (a list of them)
 
 def create_database():
     root_engine = create_engine("mysql+mysqlconnector://root:GodsGrace5@localhost")  # No database specified
     with root_engine.connect() as connection:
         connection.execute(text("CREATE DATABASE IF NOT EXISTS marvel"))
 
-
-# Without the app context, Flask wouldn't know which app's configuration to use.     
+# Flask app context to create db and tables
 with app.app_context():
     create_database()
-    db.create_all() # uses the schema to create the database tables  
-    
-    
+    db.create_all()
+
 ########### Flask Endpoints ##############
 
 @app.route('/api/characters', methods=['GET'])
@@ -78,38 +68,36 @@ def get_characters():
     result = characters_schema.dump(characters)
     return jsonify(result)
 
-
-@app.route('/characters/<int:id>', methods=['GET'])
+@app.route('/api/characters/<int:id>', methods=['GET'])
 def get_character(id):
     character = db.session.get(Character, id)
-    
+    if not character:
+        return jsonify({"message": "Character not found"}), 404
     return character_schema.jsonify(character), 200
 
-
-@app.route('/characters', methods=['POST'])
+@app.route('/api/characters', methods=['POST'])
 def create_character():
     try:
         character_data = character_schema.load(request.json)
-        
     except ValidationError as e:
         return jsonify(e.messages), 400
-    
-    new_character = Character(name=character_data['name'], 
-                              alias=character_data['alias'], 
-                              alignment=character_data['alignment'], 
-                              powers=character_data['powers'], 
-                              image_url=character_data['image_url'])
-    
+
+    new_character = Character(
+        name=character_data['name'], 
+        alias=character_data['alias'], 
+        alignment=character_data['alignment'], 
+        powers=character_data['powers'], 
+        image_url=character_data['image_url']
+    )
+
     db.session.add(new_character)
     db.session.commit()
 
     return character_schema.jsonify(new_character), 201
 
-
-@app.route('/characters/<int:id>', methods=['PUT'])
+@app.route('/api/characters/<int:id>', methods=['PUT'])
 def update_character(id):
     character = db.session.get(Character, id)
-
     if not character:
         return jsonify({"message": "Invalid character id"}), 400
 
@@ -125,22 +113,19 @@ def update_character(id):
     character.image_url = character_data['image_url']
 
     db.session.commit()
-    
+
     return character_schema.jsonify(character), 200
 
-
-@app.route('/characters/<int:id>', methods=['DELETE'])
+@app.route('/api/characters/<int:id>', methods=['DELETE'])
 def delete_character(id):
     character = db.session.get(Character, id)
-
     if not character:
         return jsonify({"message": "Invalid character id"}), 400
 
     db.session.delete(character)
     db.session.commit()
-    
-    return jsonify({"message": "Character successfully deleted"}), 200
 
+    return jsonify({"message": "Character successfully deleted"}), 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
